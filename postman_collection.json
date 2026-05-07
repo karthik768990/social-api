@@ -1,0 +1,162 @@
+{
+  "info": {
+    "name": "Social API - Redis Guardrails",
+    "description": "Complete API collection for the Social API microservice with Redis virality engine and atomic guardrails.",
+    "_postman_id": "social-api-redis-guardrails",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "baseUrl", "value": "http://localhost:8080", "type": "string" },
+    { "key": "postId",  "value": "1",                    "type": "string" },
+    { "key": "userId",  "value": "1",                    "type": "string" },
+    { "key": "botId",   "value": "1",                    "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Setup — Seed Data",
+      "item": [
+        {
+          "name": "Create User",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/users",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"username\": \"alice\",\n  \"isPremium\": true\n}"
+            }
+          }
+        },
+        {
+          "name": "Create Bot",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/bots",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"AlphaBot\",\n  \"personaDescription\": \"A friendly engagement bot.\"\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Phase 1 — Core CRUD",
+      "item": [
+        {
+          "name": "Create Post (User)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/posts",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"USER\",\n  \"content\": \"Hello world! This is my first post.\"\n}"
+            }
+          }
+        },
+        {
+          "name": "Get Post (with virality score)",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/posts/{{postId}}"
+          }
+        },
+        {
+          "name": "Like a Post (+20 virality)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/posts/{{postId}}/like",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"userId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Add Human Comment (+50 virality)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"USER\",\n  \"content\": \"Great post!\",\n  \"depthLevel\": 0\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Phase 2 — Redis Guardrails",
+      "item": [
+        {
+          "name": "Bot Comment — Allowed",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"BOT\",\n  \"content\": \"Great post, I love this!\",\n  \"depthLevel\": 1,\n  \"targetUserId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Bot Comment — Cooldown 429 (run within 10 min of previous)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"BOT\",\n  \"content\": \"Trying again too soon!\",\n  \"depthLevel\": 1,\n  \"targetUserId\": 1\n}"
+            }
+          }
+        },
+        {
+          "name": "Bot Comment — Vertical Cap 429 (depth > 20)",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": 1,\n  \"authorType\": \"BOT\",\n  \"content\": \"Deep reply!\",\n  \"depthLevel\": 21,\n  \"targetUserId\": 1\n}"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Phase 4 — Concurrency Test",
+      "item": [
+        {
+          "name": "Bot Comment (Spam — run with Runner x200)",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "// Set a unique botId per iteration to bypass cooldown across bots",
+                  "// In Collection Runner: set iterations=200, vary botId via CSV or env"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/posts/{{postId}}/comments",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"authorId\": {{botId}},\n  \"authorType\": \"BOT\",\n  \"content\": \"Concurrent bot comment!\",\n  \"depthLevel\": 1,\n  \"targetUserId\": {{userId}}\n}"
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

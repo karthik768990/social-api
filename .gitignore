@@ -11,6 +11,8 @@ target/
 *.tar.gz
 *.rar
 
+.history/
+.postman/
 # Maven wrapper downloads (keep mvnw scripts, ignore downloaded binaries)
 .mvn/wrapper/maven-wrapper.jar
 !.mvn/wrapper/maven-wrapper.properties
